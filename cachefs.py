@@ -65,15 +65,15 @@ class FileDataCache:
                     self.node_id = nid
 
                 if self.node_id == None:
-                    print "Unable to find path in db and no node_id given, unable to open cache"
+                    print("Unable to find path in db and no node_id given, unable to open cache")
                     raise CacheMiss
 
             for other_path, in self.db.execute('SELECT path FROM paths WHERE node_id = ? AND path != ?', (self.node_id, self.path)):
                 try:
                     if not os.path.exists(self.full_path) and os.path.exists(self.cache_file(other_path)):
                         os.link(self.cache_file(other_path), self.full_path)
-                except Exception, e:
-                    print "link error: %s" % e
+                except Exception as e:
+                    print("link error: %s" % e)
                     raise e
 
         self.misses = 0
@@ -92,7 +92,7 @@ class FileDataCache:
         if self.cache == None:
             try:
                 self.cache = os.open(self.full_path, self.flags)
-            except Exception, e:
+            except Exception as e:
                 self.cache = os.open(self.full_path, self.flags | os.O_CREAT )
 
 
@@ -102,8 +102,8 @@ class FileDataCache:
             rate = 100*float(self.hits)/(self.hits + self.misses)
         import pprint
         pprint.pprint(self.known_offsets())
-        print ">> %s Hits: %d, Misses: %d, Rate: %f%%" % (
-            self.path, self.hits, self.misses, rate)
+        print(">> %s Hits: %d, Misses: %d, Rate: %f%%" % (
+            self.path, self.hits, self.misses, rate))
 
     def __del__(self):
         self.close()
@@ -128,7 +128,7 @@ class FileDataCache:
 
     def __overlapping_block__(self, offset):
         conditions = self.__conditions__(offset)
-                      
+
         query = "select offset, end, last_block from blocks where %s" % conditions[0]
         result = self.db.execute(query, conditions[1])
         for db_offset, db_end, last_block in result:
@@ -157,7 +157,7 @@ class FileDataCache:
         if addr == None or (addr + s < offset + size and not last):
             self.misses += size
             raise CacheMiss
-    
+
 #        self.open()
         os.lseek(self.cache, offset, os.SEEK_SET)
         buf = os.read(self.cache, size)
@@ -183,9 +183,9 @@ class FileDataCache:
             with self.db:
                 self.db.execute("DELETE FROM blocks WHERE node_id = ? AND offset >= ?", (self.node_id, l))
                 self.db.execute("UPDATE blocks SET end = ? WHERE node_id = ? AND end > ?", (l, self.node_id, l))
-        except Exception, e:
-            print "Error truncating: %s" % e
-        
+        except Exception as e:
+            print("Error truncating: %s" % e)
+
         return
 
     def unlink(self):
@@ -210,7 +210,7 @@ class FileDataCache:
             self.db.execute("INSERT OR REPLACE INTO paths (path) values (?)", (self.path,))
 
         new_full_path = self.cache_file(new_name)
-            
+
         try:
             os.makedirs(os.path.dirname(new_full_path))
         except OSError:
@@ -219,18 +219,18 @@ class FileDataCache:
         os.rename(self.full_path, new_full_path)
 
 
-        
+
 
 
 def make_file_class(file_system):
     class CacheFile(object):
         direct_io = False
         keep_cache = False
-    
+
         def __init__(self, path, flags, *mode):
             self.path = path
             self.pp = file_system._physical_path(self.path)
-            print('>> file<%s>.open(flags=%d, mode=%s)' % (self.pp, flags, mode))
+            print(('>> file<%s>.open(flags=%d, mode=%s)' % (self.pp, flags, mode)))
 
             if len(mode) > 0:
                 self.f = os.open(self.pp, flags, mode[0])
@@ -246,10 +246,10 @@ def make_file_class(file_system):
             except CacheMiss:
                 os.lseek(self.f, offset, os.SEEK_SET)
                 buf = os.read(self.f, size)
-                
+
                 self.data_cache.update(buf, offset, os.read(self.f, 1)=='')
             return buf
-        
+
         def write(self, buf, offset):
 #            print('>> file<%s>.write(len(buf)=%d, offset=%s)' % (self.path, len(buf), offset))
             os.lseek(self.f, offset, os.SEEK_SET)
@@ -262,7 +262,7 @@ def make_file_class(file_system):
 
 
         def release(self, flags):
-            print('>> file<%s>.release()' % self.path)
+            print(('>> file<%s>.release()' % self.path))
             os.close(self.f)
             self.data_cache.close()
             self.data_cache.report()
@@ -282,14 +282,14 @@ class CacheFS(fuse.Fuse):
     def _physical_path(self, path):
         phys_path = os.path.join(self.target, path.lstrip('/'))
         return phys_path
-    
+
     def getattr(self, path):
         try:
            pp = self._physical_path(path)
            # Hide non-public files (except root)
 
            return os.lstat(pp)
-        except Exception, e:
+        except Exception as e:
            debug(str(e))
            raise e
 
@@ -334,26 +334,26 @@ class CacheFS(fuse.Fuse):
         os.access(path, flags)
 
     def mkdir(self, path, mode):
-        print('>> mkdir("%s")' % path)
+        print(('>> mkdir("%s")' % path))
         path = self._physical_path(path)
         os.mkdir(path, mode)
-        
+
     def rmdir(self, path):
-        print('>> rmdir("%s")' % path)
+        print(('>> rmdir("%s")' % path))
         os.rmdir( self._physical_path(path) )
         FileDataCache.rmdir(self.cache, path)
 
     def symlink(self, target, name):
-        print('>> symlink("%s", "%s")' % (target, name))
+        print(('>> symlink("%s", "%s")' % (target, name)))
         os.symlink(self._physical_path(target), self._physical_path(name))
 
     def link(self, target, name):
-        print('>> link(%s, %s)' % (target, name))
+        print(('>> link(%s, %s)' % (target, name)))
         os.link(self._physical_path(target), self._physical_path(name))
         FileDataCache(self.cache_db, self.cache, name, None, os.stat(self._physical_path(name)).st_ino)
 
     def rename(self, old_name, new_name):
-        print('>> rename(%s, %s)' % (old_name, new_name))
+        print(('>> rename(%s, %s)' % (old_name, new_name)))
         os.rename(self._physical_path(old_name),
                   self._physical_path(new_name))
         try:
@@ -361,13 +361,13 @@ class CacheFS(fuse.Fuse):
             fdc.rename(new_name)
         except :
             pass
-        
+
     def chmod(self, path, mode):
         os.chmod(self._physical_path(path), mode)
-        
+
     def chown(self, path, user, group):
         os.chown(self._physical_path(path), user, group)
-	
+
     def truncate(self, path, len):
         f = open(self._physical_path(path), "a")
         f.truncate(len)
@@ -390,7 +390,7 @@ def create_db(cache_dir):
 
     cache_db.execute("""
 CREATE TABLE IF NOT EXISTS paths (
-  id   INTEGER NOT NULL, 
+  id   INTEGER NOT NULL,
   node_id INTEGER,
   path STRING,
   FOREIGN KEY(node_id) REFERENCES nodes(id)
@@ -406,8 +406,8 @@ CREATE TABLE IF NOT EXISTS nodes (
 )
 """
                      )
-    
-    
+
+
     cache_db.execute("""
 CREATE TABLE IF NOT EXISTS blocks (
   node_id    INTEGER NOT NULL,
@@ -417,7 +417,7 @@ CREATE TABLE IF NOT EXISTS blocks (
   FOREIGN KEY(node_id) REFERENCES nodes(id)
 )"""
                      )
-#    cache_db.execute('create index if not exists meta on blocks (path_id, offset, end)') 
+#    cache_db.execute('create index if not exists meta on blocks (path_id, offset, end)')
     cache_db.execute("PRAGMA synchronous=OFF")
     cache_db.execute("PRAGMA journal_mode=OFF")
 
@@ -458,10 +458,10 @@ def main():
         os.mkdir(server.cache)
     except OSError:
         pass
-    
+
     server.cache_db = create_db(cache_dir)
-    
-        
+
+
 
     #except AttributeError as e:
     #    print e
@@ -470,15 +470,15 @@ def main():
     #except AttributeError as e:
     #    pass
 
-    print 'Setting up CacheFS %s ...' % CACHE_FS_VERSION
-    print '  Target       : %s' % server.target
-    print '  Cache        : %s' % server.cache
-    print '  Mount Point  : %s' % os.path.abspath(server.fuse_args.mountpoint)
-    print
-    print 'Unmount through:'
-    print '  fusermount -u %s' % server.fuse_args.mountpoint
-    print
-    print 'Done.'
+    print('Setting up CacheFS %s ...' % CACHE_FS_VERSION)
+    print('  Target       : %s' % server.target)
+    print('  Cache        : %s' % server.cache)
+    print('  Mount Point  : %s' % os.path.abspath(server.fuse_args.mountpoint))
+    print()
+    print('Unmount through:')
+    print('  fusermount -u %s' % server.fuse_args.mountpoint)
+    print()
+    print('Done.')
     server.main()
 
 if __name__ == '__main__':
