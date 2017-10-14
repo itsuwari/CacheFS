@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import shutil
 import time
 import os
@@ -62,9 +63,9 @@ class WritableStat(fuse.Stat):
 
         if flags == os.F_OK:
             return True
-        user = (self.st_mode & 0700) >> 6
-        group = (self.st_mode & 070) >> 3
-        other = self.st_mode & 07
+        user = (self.st_mode & 0o700) >> 6
+        group = (self.st_mode & 0o70) >> 3
+        other = self.st_mode & 0o7
         if uid == self.st_uid:
             # Use "user" permissions
             mode = user | group | other
@@ -85,7 +86,7 @@ class WritableStat(fuse.Stat):
         if flags & os.X_OK:
             if uid == 0:
                 # Root has special privileges. May execute if anyone can.
-                if mode & 0111 == 0:
+                if mode & 0o111 == 0:
                     return False
             else:
                 if mode & os.X_OK == 0:
@@ -109,8 +110,8 @@ class FileDataCache:
         rate = 0.0
         if self.hits + self.misses:
             rate = 100*float(self.hits)/(self.hits + self.misses)
-        print ">> %s Hits: %d, Misses: %d, Rate: %f%%" % (
-            self.path, self.hits, self.misses, rate)
+        print(">> %s Hits: %d, Misses: %d, Rate: %f%%" % (
+            self.path, self.hits, self.misses, rate))
 
     def __del__(self):
         self.close()
@@ -288,7 +289,7 @@ class CacheFS(fuse.Fuse):
            st.st_atime = int(time.time())
 
            return st
-        except Exception, e:
+        except Exception as e:
            debug(str(e))
            raise e
 
@@ -406,19 +407,19 @@ def main():
         server.meta_data = doc.doc(os.path.join(server.cache, "meta_data.db"))
 
     except AttributeError as e:
-        print e
+        print(e)
         server.parser.print_help()
         sys.exit(1)
 
-    print 'Setting up CacheFS %s ...' % CACHE_FS_VERSION
-    print '  Target       : %s' % server.target
-    print '  Cache        : %s' % server.cache
-    print '  Mount Point  : %s' % os.path.abspath(server.fuse_args.mountpoint)
-    print
-    print 'Unmount through:'
-    print '  fusermount -u %s' % server.fuse_args.mountpoint
-    print
-    print 'Done.'
+    print('Setting up CacheFS %s ...' % CACHE_FS_VERSION)
+    print('  Target       : %s' % server.target)
+    print('  Cache        : %s' % server.cache)
+    print('  Mount Point  : %s' % os.path.abspath(server.fuse_args.mountpoint))
+    print()
+    print('Unmount through:')
+    print('  fusermount -u %s' % server.fuse_args.mountpoint)
+    print()
+    print('Done.')
     server.main()
 
 if __name__ == '__main__':

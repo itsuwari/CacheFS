@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import random
 import unittest
 import shutil
@@ -292,12 +293,12 @@ class TestFileDataCacheOld():
                                                              offset), 
                                                   result))
                 except:
-                    print "\n\nresult: %s, offset: %d, len: %d" % (result,
+                    print("\n\nresult: %s, offset: %d, len: %d" % (result,
                                                                    offset, 
-                                                                   len(result))
-                    print "buffer: %s\n" % self.cache.read(len(result), offset)
-                    print self.cmp_bufs(self.cache.read(len(result), offset), 
-                                        result)
+                                                                   len(result)))
+                    print("buffer: %s\n" % self.cache.read(len(result), offset))
+                    print(self.cmp_bufs(self.cache.read(len(result), offset), 
+                                        result))
                     raise
         except:
             self.cache.report()
